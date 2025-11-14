@@ -1,0 +1,110 @@
+# ======================================================
+# Red Neuronal para Coche que evita obstáculos (Arduino AI)
+# Versión modificada: ahora con 5 salidas
+# ======================================================
+
+import numpy as np
+
+# ------------------------------------------------------
+# Definición de la red neuronal
+# ------------------------------------------------------
+class NeuralNetwork:
+    def __init__(self, layers, activation='tanh'):
+        self.activation = np.tanh
+        self.activation_deriv = lambda x: 1.0 - np.tanh(x)**2
+        self.weights = []
+        for i in range(1, len(layers)):
+            r = 2 * np.random.random((layers[i-1] + 1, layers[i] + (i < len(layers)-1))) - 1
+            self.weights.append(r * 0.25)
+
+    def fit(self, X, y, learning_rate=0.03, epochs=40000):
+        X = np.hstack([np.ones((X.shape[0], 1)), X])
+        for k in range(epochs):
+            i = np.random.randint(X.shape[0])
+            a = [X[i]]
+            for l in range(len(self.weights)):
+                a.append(self.activation(np.dot(a[l], self.weights[l])))
+
+            error = y[i] - a[-1]
+            deltas = [error * self.activation_deriv(a[-1])]
+
+            for l in range(len(a) - 2, 0, -1):
+                deltas.append(deltas[-1].dot(self.weights[l].T) * self.activation_deriv(a[l]))
+
+            deltas.reverse()
+
+            for i in range(len(self.weights)):
+                layer = np.atleast_2d(a[i])
+                delta = np.atleast_2d(deltas[i])
+                self.weights[i] += learning_rate * layer.T.dot(delta)
+
+    def predict(self, x):
+        x = np.hstack([np.ones(1), x])
+        for l in range(len(self.weights)):
+            x = self.activation(np.dot(x, self.weights[l]))
+        return x
+
+# ------------------------------------------------------
+# Datos de entrenamiento (5 salidas)
+# ------------------------------------------------------
+nn = NeuralNetwork([2,3,5], activation='tanh')
+
+X = np.array([
+    [-1, 0],
+    [-1, 1],
+    [-1, -1],
+    [0, -1],
+    [0, 1],
+    [0, 0],
+    [1, 1],
+    [1, -1],
+    [1, 0]
+])
+
+y = np.array([
+    [1,0,0,1,0],
+    [1,0,0,1,0],
+    [1,0,0,1,0],
+    [0,1,0,1,0],
+    [1,0,1,0,0],
+    [1,0,0,1,0],
+    [0,1,1,0,1],
+    [0,1,1,0,1],
+    [0,1,1,0,1]
+])
+
+print("Entrenando red neuronal, por favor espera...")
+nn.fit(X, y, learning_rate=0.03, epochs=40001)
+print("Entrenamiento finalizado.\n")
+
+def valNN(x):
+    return int(abs(round(x)))
+
+# Resultados con datos de entrenamiento
+index = 0
+for e in X:
+    pred = nn.predict(e)
+    print("X:", e, "esperado:", y[index], "obtenido:",
+          valNN(pred[0]), valNN(pred[1]), valNN(pred[2]),
+          valNN(pred[3]), valNN(pred[4]))
+    index += 1
+
+# ------------------------------------------------------
+# Simulación de 2 entradas nuevas
+# ------------------------------------------------------
+print("\n--- Simulación: nuevas entradas ---")
+
+nuevas_entradas = [
+    [-0.5, 0.8],
+    [0.7, -0.4]
+]
+
+for e in nuevas_entradas:
+    pred = nn.predict(e)
+    print("Entrada nueva:", e, "→ salida:",
+          valNN(pred[0]), valNN(pred[1]), valNN(pred[2]),
+          valNN(pred[3]), valNN(pred[4]))
+
+print("\nPesos finales:")
+for i, w in enumerate(nn.weights):
+    print(f"Capa {i+1}:\n{w}\n")
